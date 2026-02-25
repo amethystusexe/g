@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>MrCheddah - Topo Più Piccolo nel Gioco</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      background: url('sfondo.jpg') center/cover no-repeat fixed;
+      font-family: Arial;
+      user-select: none;
+      overflow: hidden;
+    }
+    #mr-cheddah {
+      position: fixed;
+      width: 260px;
+      height: 260px;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      transition: all 0.3s ease;
+    }
+    #mr-cheddah.gigante {
+      width: 500px;
+      height: 500px;
+      animation: rotazione 0.8s linear infinite;
+    }
+    @keyframes rotazione {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    #mr-cheddah.inseguendo {
+      width: 200px;  /* PIÙ PICCOLO NEL GIOCO */
+      height: 200px;
+      transition: left 0.05s linear, top 0.05s linear;
+      transform: none;
+    }
+    #formaggio {
+      position: fixed;
+      width: 100px;
+      height: 100px;
+      background: url('formaggio.png') center/contain no-repeat;
+      z-index: 10;
+      display: none;
+      pointer-events: none;
+    }
+    #status {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 28px;
+      font-weight: bold;
+      z-index: 20;
+      text-align: center;
+      background: rgba(255,255,255,0.9);
+      padding: 10px 20px;
+      border-radius: 10px;
+    }
+    #punteggio {
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 24px;
+      font-weight: bold;
+      z-index: 20;
+      background: rgba(255,255,255,0.8);
+      padding: 8px 16px;
+      border-radius: 10px;
+      display: none;
+    }
+    #banner-gameover {
+      position: fixed;
+      inset: 0;
+      background: rgba(255,0,0,0.95);
+      color: white;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-size: 36px;
+      text-align: center;
+      z-index: 30;
+    }
+    #istruzioni {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 20px;
+      color: white;
+      text-shadow: 1px 1px 2px black;
+      z-index: 20;
+    }
+    #debug {
+      position: fixed;
+      top: 120px;
+      left: 10px;
+      font-size: 14px;
+      color: lime;
+      z-index: 25;
+      display: none;
+      background: rgba(0,0,0,0.7);
+      padding: 5px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Passa su Mr Cheddah 🐭</div>
+  <div id="istruzioni">🧀🧀🧀🧀</div>
+  <div id="punteggio">💋 Bacini: <span id="contatore">0</span></div>
+  <div id="debug">Distanza: <span id="distanza">---</span>px</div>
+  
+  <img id="mr-cheddah" src="mrcheddah.png" draggable="false">
+  <div id="formaggio"></div>
+  
+  <div id="banner-gameover">
+    <div>🐭GAME OVER!🧀</div>
+    <div style="font-size: 28px; margin: 20px 0;">
+      MrCheddah ti ha preso!
+    </div>
+    <div id="bacini-finali" style="font-size: 32px; font-weight: bold;">
+      Hai vinto <span id="totale-bacini">0</span> bacini 💋
+    </div>
+    <div style="font-size: 30px; margin-top: 30px;">
+      Tanti auguri amorino ♥
+    </div>
+  </div>
+  
+  <script>
+    const topo = document.getElementById('mr-cheddah');
+    const formaggio = document.getElementById('formaggio');
+    const status = document.getElementById('status');
+    const punteggio = document.getElementById('punteggio');
+    const contatore = document.getElementById('contatore');
+    const banner = document.getElementById('banner-gameover');
+    const baciniFinali = document.getElementById('totale-bacini');
+    const istruzioni = document.getElementById('istruzioni');
+    const debug = document.getElementById('debug');
+    const distSpan = document.getElementById('distanza');
+    const audio = new Audio('squittio.mp3');
+    audio.volume = 0.8;
+    
+    let giocoAttivo = false;
+    let gameOver = false;
+    let mouseX = window.innerWidth / 2;
+    let mouseY = window.innerHeight / 2;
+    let tempoGioco = 0;
+    let bacini = 0;
+    const DISTANZA_GAMEOVER = 60;
+    let intervalBacini = null;
+    
+    document.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+      if (giocoAttivo && !gameOver) {
+        formaggio.style.left = (mouseX - 50) + 'px';
+        formaggio.style.top = (mouseY - 50) + 'px';
+      }
+    });
+    
+    topo.addEventListener('mouseenter', () => {
+      if (!giocoAttivo && !gameOver) {
+        topo.classList.add('gigante');
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+        status.textContent = 'squit squit, sposta il cursore fuori da Mr Cheddah e premi G per giocare!';
+      }
+    });
+    
+    topo.addEventListener('mouseleave', () => {
+      if (!giocoAttivo && !gameOver) {
+        topo.classList.remove('gigante');
+        status.textContent = 'Passa su Mr cheddah';
+      }
+    });
+    
+    document.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'g' && !giocoAttivo && !gameOver) {
+        giocoAttivo = true;
+        topo.classList.add('inseguendo');
+        // Topo più piccolo AUTOMATICO via CSS #inseguendo
+        status.textContent = 'SCAPPA SUCCOSO!!!';
+        punteggio.style.display = 'block';
+        istruzioni.innerHTML = 'Distanza: <span id="distanza-live"></span>px';
+        formaggio.style.display = 'block';
+        debug.style.display = 'block';
+        audio.currentTime = 0;
+        audio.play();
+        
+        tempoGioco = 0;
+        bacini = 0;
+        contatore.textContent = bacini;
+        intervalBacini = setInterval(() => {
+          bacini++;
+          contatore.textContent = bacini;
+          tempoGioco += 5;
+        }, 5000);
+        
+        gameLoop();
+      }
+    });
+    
+    function gameLoop() {
+      if (!giocoAttivo || gameOver) return;
+      
+      const rect = topo.getBoundingClientRect();
+      const centroTopoX = rect.left + rect.width / 2;
+      const centroTopoY = rect.top + rect.height / 2;
+      
+      const centroFormaggioX = mouseX;
+      const centroFormaggioY = mouseY;
+      
+      const dx = centroFormaggioX - centroTopoX;
+      const dy = centroFormaggioY - centroTopoY;
+      const distanza = Math.hypot(dx, dy);
+      
+      distSpan.textContent = Math.round(distanza);
+      
+      if (distanza < DISTANZA_GAMEOVER) {
+        gameOver = true;
+        clearInterval(intervalBacini);
+        formaggio.style.display = 'none';
+        debug.style.display = 'none';
+        banner.style.display = 'flex';
+        baciniFinali.textContent = bacini;
+        audio.currentTime = 0;
+        audio.play();
+        return;
+      }
+      
+      const velocita = 4.2;
+      const nuovaLeft = centroTopoX + (dx / distanza) * velocita - rect.width / 2;
+      const nuovaTop = centroTopoY + (dy / distanza) * velocita - rect.height / 2;
+      
+      topo.style.left = nuovaLeft + 'px';
+      topo.style.top = nuovaTop + 'px';
+      
+      requestAnimationFrame(gameLoop);
+    }
+  </script>
+</body>
+</html>
