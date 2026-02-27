@@ -189,6 +189,9 @@
         istruzioni.innerHTML = 'Distanza: <span id="distanza-live"></span>px';
         formaggio.style.display = 'block';
         debug.style.display = 'block';
+
+        document.body.style.cursor = 'none';
+        
         audio.currentTime = 0;
         audio.play();
         
@@ -228,6 +231,10 @@
         debug.style.display = 'none';
         banner.style.display = 'flex';
         baciniFinali.textContent = bacini;
+
+        document.body.style.cursor = 'default';
+
+        
         audio.currentTime = 0;
         audio.play();
         return;
@@ -245,6 +252,7 @@
   </script>
 </body>
 </html>
+
 
 
 
