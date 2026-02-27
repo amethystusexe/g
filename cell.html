@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MrCheddah Mobile</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      background: url('sfondo.jpg') center/cover no-repeat fixed;
+      font-family: Arial;
+      user-select: none;
+      overflow: hidden;
+      touch-action: none; /* Migliora touch */
+    }
+    #mr-cheddah {
+      position: fixed;
+      width: min(260px, 60vw); /* Responsive */
+      height: min(260px, 60vw);
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      transition: all 0.3s ease;
+      touch-action: manipulation;
+    }
+    #mr-cheddah.gigante {
+      width: min(500px, 90vw);
+      height: min(500px, 90vw);
+      animation: rotazione 0.8s linear infinite;
+    }
+    @keyframes rotazione {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    #mr-cheddah.inseguendo {
+      width: min(200px, 50vw);
+      height: min(200px, 50vw);
+      transition: left 0.05s linear, top 0.05s linear;
+      transform: none;
+    }
+    #formaggio {
+      position: fixed;
+      width: min(100px, 25vw);
+      height: min(100px, 25vw);
+      background: url('formaggio.png') center/contain no-repeat;
+      z-index: 10;
+      display: none;
+      pointer-events: none;
+    }
+    #status {
+      position: fixed;
+      top: 5vh;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: clamp(20px, 5vw, 28px);
+      font-weight: bold;
+      z-index: 20;
+      text-align: center;
+      background: rgba(255,255,255,0.95);
+      padding: 1rem;
+      border-radius: 15px;
+      max-width: 90vw;
+    }
+    #punteggio {
+      position: fixed;
+      top: 20vh;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: clamp(18px, 4vw, 24px);
+      font-weight: bold;
+      z-index: 20;
+      background: rgba(255,255,255,0.9);
+      padding: 0.8rem 1.5rem;
+      border-radius: 15px;
+      display: none;
+    }
+    #banner-gameover {
+      position: fixed;
+      inset: 0;
+      background: rgba(255,0,0,0.98);
+      color: white;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-size: clamp(28px, 8vw, 36px);
+      text-align: center;
+      z-index: 30;
+      padding: 2rem;
+    }
+    #istruzioni {
+      position: fixed;
+      bottom: 5vh;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: clamp(16px, 4.5vw, 20px);
+      color: white;
+      text-shadow: 2px 2px 4px black;
+      z-index: 20;
+      text-align: center;
+      max-width: 90vw;
+    }
+    #debug {
+      position: fixed;
+      top: 30vh;
+      left: 2vw;
+      font-size: clamp(12px, 3vw, 14px);
+      color: lime;
+      z-index: 25;
+      display: none;
+      background: rgba(0,0,0,0.8);
+      padding: 0.5rem;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Passa su Mr Cheddah 🐭</div>
+  <div id="istruzioni">Toccalo 3 volte per giocare! 🧀</div>
+  <div id="punteggio">💋 Bacini: <span id="contatore">0</span></div>
+  <div id="debug">Distanza: <span id="distanza">---</span>px</div>
+  
+  <img id="mr-cheddah" src="mrcheddah.png" draggable="false">
+  <div id="formaggio"></div>
+  
+  <div id="banner-gameover">
+    <div>🐭 GAME OVER! 🧀</div>
+    <div style="font-size: clamp(24px, 6vw, 28px); margin: 2vh 0;">
+      MrCheddah ti ha preso!
+    </div>
+    <div id="bacini-finali" style="font-size: clamp(28px, 7vw, 32px); font-weight: bold;">
+      Hai vinto <span id="totale-bacini">0</span> bacini 💋
+    </div>
+    <div style="font-size: clamp(20px, 5vw, 30px); margin-top: 3vh;">
+      Tanti auguri amorino ♥
+    </div>
+  </div>
+  
+  <script>
+    const topo = document.getElementById('mr-cheddah');
+    const formaggio = document.getElementById('formaggio');
+    const status = document.getElementById('status');
+    const punteggio = document.getElementById('punteggio');
+    const contatore = document.getElementById('contatore');
+    const banner = document.getElementById('banner-gameover');
+    const baciniFinali = document.getElementById('totale-bacini');
+    const istruzioni = document.getElementById('istruzioni');
+    const debug = document.getElementById('debug');
+    const distSpan = document.getElementById('distanza');
+    const audio = new Audio('squittio.mp3');
+    audio.volume = 0.8;
+    
+    let giocoAttivo = false;
+    let gameOver = false;
+    let mouseX = window.innerWidth / 2;
+    let mouseY = window.innerHeight / 2;
+    let tempoGioco = 0;
+    let bacini = 0;
+    const DISTANZA_GAMEOVER = 60;
+    let intervalBacini = null;
+    
+    // TRIPLO TAP VARIABILI
+    let tapCount = 0;
+    let tapTimer = null;
+    const TAP_TIMEOUT = 800; // 800ms tra tocchi
+    
+    // Touch + Mouse tracking
+    ['mousemove', 'touchmove'].forEach(eventType => {
+      document.addEventListener(eventType, (e) => {
+        if (e.touches) {
+          e = e.touches[0];
+        }
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        if (giocoAttivo && !gameOver) {
+          formaggio.style.left = (mouseX - 50) + 'px';
+          formaggio.style.top = (mouseY - 50) + 'px';
+        }
+      });
+    });
+    
+    // Hover iniziale (desktop)
+    topo.addEventListener('mouseenter', () => {
+      if (!giocoAttivo && !gameOver) {
+        topo.classList.add('gigante');
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+        status.textContent = 'squit squit! Tocca 3 volte per giocare!';
+      }
+    });
+    
+    topo.addEventListener('mouseleave', () => {
+      if (!giocoAttivo && !gameOver) {
+        topo.classList.remove('gigante');
+        status.textContent = 'Passa su Mr Cheddah';
+      }
+    });
+    
+    // TRIPLO TAP/CLICK per avviare gioco (mobile + desktop)
+    topo.addEventListener('click', () => {
+      if (giocoAttivo || gameOver) return;
+      
+      tapCount++;
+      
+      if (tapCount === 1) {
+        tapTimer = setTimeout(() => {
+          tapCount = 0;
+        }, TAP_TIMEOUT);
+      }
+      
+      if (tapCount === 3) {
+        clearTimeout(tapTimer);
+        tapCount = 0;
+        startGame();
+      }
+    });
+    
+    // FUNZIONE START GIOCO
+    function startGame() {
+      giocoAttivo = true;
+      topo.classList.add('inseguendo');
+      status.textContent = 'SCAPPA SUCCOSO!!! 🧀🐭';
+      punteggio.style.display = 'block';
+      istruzioni.innerHTML = 'Distanza: <span id="distanza-live"></span>px';
+      formaggio.style.display = 'block';
+      debug.style.display = 'block';
+
+      // Nascondi cursore solo su desktop
+      document.body.style.cursor = 'none';
+
+      audio.currentTime = 0;
+      audio.play();
+      
+      tempoGioco = 0;
+      bacini = 0;
+      contatore.textContent = bacini;
+      intervalBacini = setInterval(() => {
+        bacini++;
+        contatore.textContent = bacini;
+        tempoGioco += 5;
+      }, 5000);
+      
+      gameLoop();
+    }
+    
+    function gameLoop() {
+      if (!giocoAttivo || gameOver) return;
+      
+      const rect = topo.getBoundingClientRect();
+      const centroTopoX = rect.left + rect.width / 2;
+      const centroTopoY = rect.top + rect.height / 2;
+      
+      const centroFormaggioX = mouseX;
+      const centroFormaggioY = mouseY;
+      
+      const dx = centroFormaggioX - centroTopoX;
+      const dy = centroFormaggioY - centroTopoY;
+      const distanza = Math.hypot(dx, dy);
+      
+      distSpan.textContent = Math.round(distanza);
+      
+      if (distanza < DISTANZA_GAMEOVER) {
+        gameOver = true;
+        clearInterval(intervalBacini);
+        formaggio.style.display = 'none';
+        debug.style.display = 'none';
+        banner.style.display = 'flex';
+        baciniFinali.textContent = bacini;
+
+        document.body.style.cursor = 'default'; // Ripristina cursore
+
+        audio.currentTime = 0;
+        audio.play();
+        return;
+      }
+      
+      const velocita = 24;
+      const nuovaLeft = centroTopoX + (dx / distanza) * velocita - rect.width / 2;
+      const nuovaTop = centroTopoY + (dy / distanza) * velocita - rect.height / 2;
+      
+      topo.style.left = nuovaLeft + 'px';
+      topo.style.top = nuovaTop + 'px';
+      
+      requestAnimationFrame(gameLoop);
+    }
+  </script>
+</body>
+</html>
