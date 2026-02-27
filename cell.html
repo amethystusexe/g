@@ -12,11 +12,11 @@
       font-family: Arial;
       user-select: none;
       overflow: hidden;
-      touch-action: none; /* Migliora touch */
+      touch-action: none;
     }
     #mr-cheddah {
       position: fixed;
-      width: min(260px, 60vw); /* Responsive */
+      width: min(260px, 60vw);
       height: min(260px, 60vw);
       left: 50%;
       top: 50%;
@@ -118,7 +118,7 @@
 </head>
 <body>
   <div id="status">Passa su Mr Cheddah 🐭</div>
-  <div id="istruzioni">Toccalo 3 volte per giocare! 🧀</div>
+  <div id="istruzioni">Tocca **OVUNQUE** (tranne il topo) per giocare! 🧀</div>
   <div id="punteggio">💋 Bacini: <span id="contatore">0</span></div>
   <div id="debug">Distanza: <span id="distanza">---</span>px</div>
   
@@ -161,10 +161,26 @@
     const DISTANZA_GAMEOVER = 60;
     let intervalBacini = null;
     
-    // TRIPLO TAP VARIABILI
-    let tapCount = 0;
-    let tapTimer = null;
-    const TAP_TIMEOUT = 800; // 800ms tra tocchi
+    // ✅ NUOVO: Click/Tap SU TUTTO LO SCHERMO per iniziare (tranne topo)
+    document.addEventListener('click', startGameIfNotActive);
+    document.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      startGameIfNotActive(e);
+    });
+    
+    function startGameIfNotActive(e) {
+      if (giocoAttivo || gameOver) return;
+      
+      // Controlla se il click è FUORI dal topo
+      const rect = topo.getBoundingClientRect();
+      const clickX = e.clientX || e.touches[0].clientX;
+      const clickY = e.clientY || e.touches[0].clientY;
+      
+      if (clickX < rect.left || clickX > rect.right || 
+          clickY < rect.top || clickY > rect.bottom) {
+        startGame();
+      }
+    }
     
     // Touch + Mouse tracking
     ['mousemove', 'touchmove'].forEach(eventType => {
@@ -181,13 +197,13 @@
       });
     });
     
-    // Hover iniziale (desktop)
+    // Hover iniziale (solo desktop)
     topo.addEventListener('mouseenter', () => {
       if (!giocoAttivo && !gameOver) {
         topo.classList.add('gigante');
         audio.currentTime = 0;
         audio.play().catch(() => {});
-        status.textContent = 'squit squit! Tocca 3 volte per giocare!';
+        status.textContent = 'squit squit! Tocca OVUNQUE per giocare!';
       }
     });
     
@@ -198,26 +214,7 @@
       }
     });
     
-    // TRIPLO TAP/CLICK per avviare gioco (mobile + desktop)
-    topo.addEventListener('click', () => {
-      if (giocoAttivo || gameOver) return;
-      
-      tapCount++;
-      
-      if (tapCount === 1) {
-        tapTimer = setTimeout(() => {
-          tapCount = 0;
-        }, TAP_TIMEOUT);
-      }
-      
-      if (tapCount === 3) {
-        clearTimeout(tapTimer);
-        tapCount = 0;
-        startGame();
-      }
-    });
-    
-    // FUNZIONE START GIOCO
+    // FUNZIONE START GIOCO (invariata)
     function startGame() {
       giocoAttivo = true;
       topo.classList.add('inseguendo');
@@ -226,10 +223,8 @@
       istruzioni.innerHTML = 'Distanza: <span id="distanza-live"></span>px';
       formaggio.style.display = 'block';
       debug.style.display = 'block';
-
-      // Nascondi cursore solo su desktop
       document.body.style.cursor = 'none';
-
+      
       audio.currentTime = 0;
       audio.play();
       
@@ -268,9 +263,7 @@
         debug.style.display = 'none';
         banner.style.display = 'flex';
         baciniFinali.textContent = bacini;
-
-        document.body.style.cursor = 'default'; // Ripristina cursore
-
+        document.body.style.cursor = 'default';
         audio.currentTime = 0;
         audio.play();
         return;
